@@ -1,0 +1,40 @@
+const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const P = require('pino');
+const express = require('express');
+const app = express();
+app.get('/', (req,res)=>res.send('BOT 24/7 PRENDIDO'));
+app.listen(3000);
+let reg = {};
+let clanId = '';
+let NUMERO_BOT = '351962987931';
+async function start(){
+  const { state, saveCreds } = await useMultiFileAuthState('sesion');
+  const sock = makeWASocket({ auth: state, logger: P({level:'silent'}), browser: ['MasterBlak','Chrome','1.0'] });
+  sock.ev.on('creds.update', saveCreds);
+  if(!state.creds.registered){
+    setTimeout(async ()=>{
+      let codigo = await sock.requestPairingCode(NUMERO_BOT);
+      console.log('TU CODIGO ES: ' + codigo);
+    }, 3000);
+  }
+  sock.ev.on('connection.update', (u)=>{
+    if(u.connection==='open') console.log('BOT 24/7 PRENDIDO');
+    if(u.connection==='close') setTimeout(()=>start(), 5000);
+  });
+  sock.ev.on('messages.upsert', async (m)=>{
+    let msg = m.messages[0];
+    if(!msg.message || msg.key.fromMe) return;
+    let texto = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+    let jid = msg.key.remoteJid;
+    let nombre = msg.pushName || 'Jugador';
+    let t = texto.trim();
+    let reply = async (txt)=>{ await sock.sendMessage(jid,{text:txt},{quoted:msg}) };
+    if(t==='/menuclan') await reply(`🔥 BOT MASTER BLAK 24/7 🔥\n\n/menuclan\n/setclanff ID\n/reg UID\n/miembros\n/sala ID CLAVE\n/voy\n/rankingclan`);
+    if(t.startsWith('/setclanff')){ clanId = t.split(' ')[1]; await reply('✅ CLAN: '+clanId); }
+    if(t.startsWith('/reg ')){ reg[nombre]=t.split(' ')[1]; await reply(`✅ REGISTRADO ${nombre}`); }
+    if(t==='/miembros'){ let txt='👥 MIEMBROS\n'; for(let n in reg) txt+=n+' - '+reg[n]+'\n'; await reply(txt); }
+    if(t.startsWith('/sala')){ let p=t.split(' '); await reply(`🎮 SALA ID: ${p[1]} CLAVE: ${p[2]}`); }
+    if(t==='/voy') await reply(`✅ ${nombre} CONFIRMADO 🔥`);
+  });
+}
+start();
